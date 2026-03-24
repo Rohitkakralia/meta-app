@@ -1,10 +1,7 @@
 import NextAuth from "next-auth"
 import FacebookProvider from "next-auth/providers/facebook"
-import { PrismaAdapter } from "@next-auth/prisma-adapter"
-import { prisma } from "@/lib/prisma"
 
 const handler = NextAuth({
-  adapter: PrismaAdapter(prisma),
   providers: [
     FacebookProvider({
       clientId: process.env.FACEBOOK_CLIENT_ID,
@@ -36,7 +33,7 @@ const handler = NextAuth({
     error: '/auth/error',
   },
   session: {
-    strategy: "database"
+    strategy: "jwt"
   }
 })
 
