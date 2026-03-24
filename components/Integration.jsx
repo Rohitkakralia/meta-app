@@ -405,10 +405,26 @@ export default function WhatsAppIntegration() {
 
   // Check existing Facebook integration on component mount
   useEffect(() => {
-    if (session) {
-      checkFacebookIntegration();
+    if (session?.user && status === "authenticated") {
+      console.log("Session detected:", session); // Debug log
+      // If user is logged in with Facebook OAuth, show as connected
+      setIntegrationStatus("connected");
+      setFbAccount({ 
+        name: session.user.name || "Facebook User", 
+        id: session.user.id || "facebook_user", 
+        avatar: session.user.name?.substring(0, 2).toUpperCase() || "FB",
+        email: session.user.email
+      });
+      // Fetch user's Facebook pages with a small delay to ensure session is fully loaded
+      setTimeout(() => {
+        fetchFacebookPages();
+      }, 1000);
+    } else if (status === "unauthenticated") {
+      setIntegrationStatus("disconnected");
+      setFbAccount(null);
+      setFbPages([]);
     }
-  }, [session]);
+  }, [session, status]);
 
   const checkFacebookIntegration = async () => {
     try {
@@ -456,17 +472,22 @@ export default function WhatsAppIntegration() {
 
   const fetchFacebookPages = async () => {
     try {
-      // Get access token from session (you might need to modify this based on your NextAuth setup)
+      console.log("Current session:", session); // Debug log
+      
+      // Use the access token from the session
       const response = await fetch('/api/facebook/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: session?.accessToken })
+        body: JSON.stringify({})
       });
       
       const data = await response.json();
+      console.log("Pages API response:", data); // Debug log
       
       if (data.success) {
         setFbPages(data.pages);
+      } else {
+        console.error("Failed to fetch pages:", data.error);
       }
     } catch (error) {
       console.error("Error fetching Facebook pages:", error);
@@ -533,7 +554,7 @@ export default function WhatsAppIntegration() {
   const closeModal = () => { if (!loading) { setShowModal(false); } };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-6 flex items-start justify-center">
+    <div className="min-h-screen text-gray-100 p-6 flex items-start justify-center">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         * { font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -550,10 +571,15 @@ export default function WhatsAppIntegration() {
         {/* ── Page Title ── */}
         <div>
           <div className="flex items-center gap-2 mb-1 text-xs font-mono text-gray-500 uppercase tracking-widest">
-            Integrations <span className="text-gray-700">/</span> <span className="text-green-400">WhatsApp</span>
+            Integrations <span className="text-gray-700">/</span> <span className="text-blue-400">Facebook</span>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Connect WhatsApp Business</h1>
-          <p className="text-sm text-gray-400 mt-1">Connect with customers on their favorite messaging app. Send updates, support messages, and more directly through WhatsApp.</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">Facebook Integration</h1>
+          <p className="text-sm text-gray-400 mt-1">
+            {integrationStatus === "connected" 
+              ? `Connected as ${fbAccount?.name || 'Facebook User'}. Manage your Facebook pages and WhatsApp Business integration.`
+              : "Connect your Facebook account to access pages and enable WhatsApp Business messaging."
+            }
+          </p>
         </div>
 
         {/* ── Featured Card ── */}
@@ -571,17 +597,19 @@ export default function WhatsAppIntegration() {
               {/* Top Row */}
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  {/* WA Icon */}
-                  <div className="w-14 h-14 rounded-2xl bg-[#128C7E] flex items-center justify-center shadow-lg shadow-green-900/30 flex-shrink-0">
+                  {/* Facebook Icon */}
+                  <div className="w-14 h-14 rounded-2xl bg-[#1877F2] flex items-center justify-center shadow-lg shadow-blue-900/30 flex-shrink-0">
                     <svg viewBox="0 0 32 32" fill="none" className="w-8 h-8">
-                      <path d="M22.003 19.232c-.277-.14-1.637-.813-1.89-.906-.254-.092-.439-.139-.624.14-.185.277-.717.905-.879 1.09-.162.185-.323.208-.6.07-.277-.14-1.17-.433-2.228-1.381-.824-.737-1.38-1.647-1.542-1.924-.162-.277-.017-.427.122-.565.124-.124.277-.323.416-.485.138-.162.185-.277.277-.462.093-.185.047-.347-.023-.485-.07-.139-.624-1.503-.854-2.058-.225-.54-.454-.467-.624-.476l-.531-.009c-.185 0-.485.07-.739.347-.254.277-.97.948-.97 2.312 0 1.363.993 2.681 1.131 2.866.138.185 1.955 2.985 4.737 4.187.662.285 1.178.456 1.58.583.663.211 1.267.181 1.744.11.532-.08 1.637-.67 1.868-1.317.231-.647.231-1.202.162-1.317-.07-.116-.254-.185-.531-.324z" fill="white"/>
-                      <path d="M16 4C9.373 4 4 9.373 4 16c0 2.126.557 4.123 1.532 5.855L4 28l6.347-1.505A11.944 11.944 0 0016 28c6.627 0 12-5.373 12-12S22.627 4 16 4z" fill="none" stroke="white" strokeWidth="1.5"/>
+                      <path d="M22 16c0-3.314-2.686-6-6-6s-6 2.686-6 6c0 2.994 2.193 5.477 5.063 5.93V17.89h-1.524V16h1.524v-1.322c0-1.504.896-2.334 2.267-2.334.657 0 1.344.117 1.344.117v1.477h-.757c-.746 0-.977.463-.977.938V16h1.664l-.266 1.89h-1.398v4.04C19.807 21.477 22 18.994 22 16z" fill="white"/>
                     </svg>
                   </div>
                   <div>
-                    <h2 className="text-lg font-extrabold text-white">WhatsApp Business</h2>
+                    <h2 className="text-lg font-extrabold text-white">Facebook Integration</h2>
                     <p className="text-sm text-gray-400 mt-0.5 max-w-xs">
-                      Connect with customers on their favorite messaging app. Send updates, support messages, and more…
+                      {integrationStatus === "connected" 
+                        ? "Your Facebook account is connected and ready to use."
+                        : "Connect your Facebook account to access pages and enable messaging features."
+                      }
                     </p>
                   </div>
                 </div>
@@ -638,6 +666,93 @@ export default function WhatsAppIntegration() {
             </div>
           </div>
         </div>
+
+        {/* ── Facebook Pages (when connected) ── */}
+        {integrationStatus === "connected" && fbPages.length > 0 && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-white">Your Facebook Pages</h3>
+              <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-full font-semibold">
+                {fbPages.length} {fbPages.length === 1 ? 'Page' : 'Pages'}
+              </span>
+            </div>
+            <div className="grid gap-3">
+              {fbPages.map((page) => (
+                <div key={page.id} className="flex items-center gap-4 p-4 bg-gray-800/50 border border-gray-700 rounded-xl hover:bg-gray-800/70 transition-colors">
+                  {/* Page Avatar */}
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {page.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  
+                  {/* Page Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-white truncate">{page.name}</div>
+                    <div className="text-xs text-gray-400 font-mono">ID: {page.id}</div>
+                    {page.category && (
+                      <div className="text-xs text-gray-500 mt-1">{page.category}</div>
+                    )}
+                  </div>
+                  
+                  {/* Page Actions */}
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => handlePageSelect(page)}
+                      className="px-3 py-1.5 text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 transition-colors"
+                    >
+                      Select
+                    </button>
+                    {selectedPage?.id === page.id && (
+                      <span className="text-xs px-2 py-1 bg-green-500/10 text-green-400 border border-green-500/30 rounded-full font-semibold">
+                        ✓ Selected
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* No pages message */}
+            {fbPages.length === 0 && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-8 h-8 text-gray-500" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/>
+                  </svg>
+                </div>
+                <p className="text-sm text-gray-400">No Facebook pages found</p>
+                <p className="text-xs text-gray-500 mt-1">Make sure you have admin access to Facebook pages</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Account Info (when connected) ── */}
+        {integrationStatus === "connected" && fbAccount && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <h3 className="text-sm font-bold text-white mb-4">Connected Account</h3>
+            <div className="flex items-center gap-4 p-4 bg-gray-800/50 border border-gray-700 rounded-xl">
+              {/* Facebook Avatar */}
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                {fbAccount.avatar}
+              </div>
+              
+              {/* Account Info */}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold text-white">{fbAccount.name}</div>
+                {fbAccount.email && (
+                  <div className="text-xs text-gray-400">{fbAccount.email}</div>
+                )}
+                <div className="text-xs text-gray-500 font-mono mt-1">User ID: {fbAccount.id}</div>
+              </div>
+              
+              {/* Status Badge */}
+              <div className="flex items-center gap-1.5 text-xs font-bold text-green-400 bg-green-500/10 border border-green-500/30 px-3 py-1.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                Connected
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── What you can do ── */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">

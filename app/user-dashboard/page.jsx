@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Contact from "@/components/Contact";
 import Integrations from "@/components/Integration";
+import Campaign from "@/components/Campaign";
 
 // ─── Tab Components ───────────────────────────────────────────────────────────
 
@@ -74,12 +75,7 @@ const Users = () => (
 
 
 
-const Campaign = () => (
-  <div className="animate-fadeUp">
-    <h2 className="text-2xl font-extrabold tracking-tight mb-6">Campaign</h2>
-    
-  </div>
-);
+
 
 const Settings = () => {
   const [notifications, setNotifications] = useState(true);
