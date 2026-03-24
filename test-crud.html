@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Contact API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        button {
+            margin: 5px;
+            padding: 10px;
+        }
+
+        .result {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Contact API CRUD Test</h1>
+
+    <div>
+        <h3>Test Operations:</h3>
+        <button onclick="testGetAll()">GET All Contacts</button>
+        <button onclick="testAdd()">ADD Contact</button>
+        <button onclick="testUpdate()">UPDATE Contact</button>
+        <button onclick="testDelete()">DELETE Contact</button>
+        <button onclick="testBulkDelete()">BULK DELETE</button>
+        <button onclick="testImport()">IMPORT CSV</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = '/api/contactAPI';
+        let testContactId = null;
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            document.getElementById('results').appendChild(div);
+        }
+
+        async function request(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Content-Type': 'application/json' },
+                    ...options
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || `HTTP ${response.status}`);
+                }
+
+                return data;
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        async function testGetAll() {
+            try {
+                const result = await request(API_BASE);
+                log(`GET All: Found ${result.data.length} contacts`, 'success');
+                console.log('Contacts:', result.data);
+            } catch (error) {
+                log(`GET All failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAdd() {
+            try {
+                const result = await request(`${API_BASE}/addManually`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        name: 'Test User ' + Date.now(),
+                        phone: '+91 ' + Math.floor(Math.random() * 10000000000),
+                        source: 'test'
+                    })
+                });
+                testContactId = result.data.id;
+                log(`ADD: Created contact ID ${testContactId}`, 'success');
+            } catch (error) {
+                log(`ADD failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testUpdate() {
+            if (!testContactId) {
+                log('No test contact ID. Run ADD first.', 'error');
+                return;
+            }
+
+            try {
+                const result = await request(`${API_BASE}/${testContactId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name: 'Updated Test User',
+                        phone: '+91 9999999999',
+                        source: 'updated'
+                    })
+                });
+                log(`UPDATE: Updated contact ID ${testContactId}`, 'success');
+            } catch (error) {
+                log(`UPDATE failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDelete() {
+            if (!testContactId) {
+                log('No test contact ID. Run ADD first.', 'error');
+                return;
+            }
+
+            try {
+                const result = await request(`${API_BASE}/${testContactId}`, {
+                    method: 'DELETE'
+                });
+                log(`DELETE: Deleted contact ID ${testContactId}`, 'success');
+                testContactId = null;
+            } catch (error) {
+                log(`DELETE failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testBulkDelete() {
+            try {
+                // First create some test contacts
+                const contacts = [];
+                for (let i = 0; i < 3; i++) {
+                    const result = await request(`${API_BASE}/addManually`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            name: `Bulk Test ${i}`,
+                            phone: `+91 ${Math.floor(Math.random() * 10000000000)}`,
+                            source: 'bulk-test'
+                        })
+                    });
+                    contacts.push(result.data.id);
+                }
+
+                // Now delete them
+                const result = await request(API_BASE, {
+                    method: 'DELETE',
+                    body: JSON.stringify({ ids: contacts })
+                });
+                log(`BULK DELETE: Deleted ${result.deletedCount} contacts`, 'success');
+            } catch (error) {
+                log(`BULK DELETE failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testImport() {
+            try {
+                const csvData = [
+                    { name: 'CSV User 1', phone: '+91 1111111111', source: 'csv' },
+                    { name: 'CSV User 2', phone: '+91 2222222222', source: 'csv' },
+                    { name: 'CSV User 3', phone: '+91 3333333333', source: 'csv' }
+                ];
+
+                const result = await request(`${API_BASE}/importContact`, {
+                    method: 'POST',
+                    body: JSON.stringify({ contacts: csvData })
+                });
+                log(`IMPORT: Imported ${result.data.length} contacts`, 'success');
+            } catch (error) {
+                log(`IMPORT failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-test on load
+        log('API Test page loaded. Click buttons to test endpoints.');
+    </script>
+</body>
+
+</html>
