@@ -3,6 +3,7 @@ import { useState } from "react";
 import Contact from "@/components/Contact";
 import Integrations from "@/components/Integration";
 import Campaign from "@/components/Campaign";
+import Templates from "@/components/Templates";
 
 // ─── Tab Components ───────────────────────────────────────────────────────────
 
@@ -125,6 +126,7 @@ const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "▣", component: Dashboard },
   { id: "contacts",     label: "Contacts",     icon: "◎", component: Contact },
   { id: "integrations", label: "Integrations", icon: "△", component: Integrations },
+  { id: "templates",    label: "Templates",    icon: "📄", component: () => <Templates /> },
   { id: "campaign",   label: "Campaign",   icon: "▤", component: Campaign },
   { id: "settings",  label: "Settings",  icon: "⊙", component: Settings },
 ];

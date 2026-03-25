@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useContactAPI } from "@/app/hooks/contactInfoAPIs";
+import TemplateModal from "./TemplateModal";
 
 // ─── Mock DB ──────────────────────────────────────────────────────────────────
 const INITIAL = [];
@@ -139,6 +140,7 @@ const ContactForm = ({
   const [form, setForm] = useState(initial);
   const [errors, setErrors] = useState({});
   const { addContactManually, updateContact: updateContactAPI, loading } = useContactAPI();
+   
 
   const validate = () => {
     const e = {};
@@ -278,6 +280,15 @@ const ImportPanel = ({ onImport, onCancel }) => {
       onImport(result.data || []); // Pass the imported data back
     }
   };
+
+  const handleSendMessage = async (template) => {
+  // TODO: Wire up your actual send API here
+  // Example: await fetch('/api/whatsapp/send', { method: 'POST', body: JSON.stringify({ templateId: template.id, contactIds: Array.from(selIds) }) })
+  console.log("Sending template:", template.name, "to contacts:", Array.from(selIds));
+  showToast(`Sent "${template.name}" to ${selIds.size} contact${selIds.size !== 1 ? "s" : ""}`, "success");
+  setShowTemplateModal(false);
+};
+
 
   return (
     <div className="flex flex-col gap-4">
@@ -437,6 +448,7 @@ export default function ContactManager() {
   const [filterSrc, setFilterSrc] = useState("All");
   const [toast, setToast] = useState(null);
   const [selIds, setSelIds] = useState(new Set());
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
   const { 
     fetchContacts, 
     addContactManually, 
@@ -592,15 +604,25 @@ export default function ContactManager() {
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {selIds.size > 0 && (
-              <button
-                onClick={deleteBulk}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-600/40 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                🗑 {loading ? "Deleting..." : `Delete (${selIds.size})`}
-              </button>
-            )}
+             {selIds.size > 0 && (
+    <>
+      <button
+        onClick={() => setShowTemplateModal(true)}
+        disabled={loading}
+        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-600/40 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        💬 {`Send Message (${selIds.size})`}
+      </button>
+      <button
+        onClick={deleteBulk}
+        disabled={loading}
+        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-600/40 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        🗑 {loading ? "Deleting..." : `Delete (${selIds.size})`}
+      </button>
+    </>
+  )}
+            
             <button
               onClick={() => setModal("import")}
               disabled={loading}
@@ -924,6 +946,13 @@ export default function ContactManager() {
           />
         </Modal>
       )}
+        {showTemplateModal && (
+    <TemplateModal
+      selectedCount={selIds.size}
+      onClose={() => setShowTemplateModal(false)}
+      onSend={handleSendMessage}
+    />
+  )}
 
       {toast && <Toast msg={toast.msg} type={toast.type} />}
     </div>
