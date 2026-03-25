@@ -42,6 +42,7 @@ export async function GET(request) {
 
     const data = await response.json();
     console.log("[getTemplates] Facebook API response:", data);
+    console.log("components:", data.components);
 
     if (!response.ok) {
       // Forward Facebook's error message

@@ -139,8 +139,11 @@ const ContactForm = ({
 }) => {
   const [form, setForm] = useState(initial);
   const [errors, setErrors] = useState({});
-  const { addContactManually, updateContact: updateContactAPI, loading } = useContactAPI();
-   
+  const {
+    addContactManually,
+    updateContact: updateContactAPI,
+    loading,
+  } = useContactAPI();
 
   const validate = () => {
     const e = {};
@@ -161,12 +164,12 @@ const ContactForm = ({
     if (Object.keys(e).length) return setErrors(e);
 
     console.log("Submitted form:", form);
-    
+
     // Use different API call based on whether it's edit or add
-    const resp = isEdit 
+    const resp = isEdit
       ? await updateContactAPI(initial.id, form)
       : await addContactManually(form);
-      
+
     console.log("API response:", resp);
 
     if (resp && !resp.error) {
@@ -280,15 +283,6 @@ const ImportPanel = ({ onImport, onCancel }) => {
       onImport(result.data || []); // Pass the imported data back
     }
   };
-
-  const handleSendMessage = async (template) => {
-  // TODO: Wire up your actual send API here
-  // Example: await fetch('/api/whatsapp/send', { method: 'POST', body: JSON.stringify({ templateId: template.id, contactIds: Array.from(selIds) }) })
-  console.log("Sending template:", template.name, "to contacts:", Array.from(selIds));
-  showToast(`Sent "${template.name}" to ${selIds.size} contact${selIds.size !== 1 ? "s" : ""}`, "success");
-  setShowTemplateModal(false);
-};
-
 
   return (
     <div className="flex flex-col gap-4">
@@ -449,13 +443,13 @@ export default function ContactManager() {
   const [toast, setToast] = useState(null);
   const [selIds, setSelIds] = useState(new Set());
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const { 
-    fetchContacts, 
-    addContactManually, 
-    updateContact: updateContactAPI, 
-    deleteContact: deleteContactAPI, 
+  const {
+    fetchContacts,
+    addContactManually,
+    updateContact: updateContactAPI,
+    deleteContact: deleteContactAPI,
     deleteContacts: deleteContactsAPI,
-    loading 
+    loading,
   } = useContactAPI();
 
   // Load contacts from database on component mount
@@ -502,11 +496,11 @@ export default function ContactManager() {
       created_at: contact.created_at || today(),
       updated_at: contact.updated_at || today(),
     }));
-    
+
     // Refresh the entire contact list from database to ensure consistency
     await loadContacts();
     closeModal();
-    
+
     // Show appropriate message based on results
     if (transformedContacts.length > 0) {
       showToast(`${transformedContacts.length} contacts imported successfully`);
@@ -542,6 +536,55 @@ export default function ContactManager() {
       await loadContacts(); // Refresh from database
       showToast(`${selIds.size} contacts deleted`, "error");
       setSelIds(new Set());
+    }
+  };
+
+  const handleSendMessage = async (template) => {
+    // Get the full contact objects for selected IDs
+    const selectedContacts = contacts.filter((c) => selIds.has(c.id));
+
+    const res = await fetch("/api/whatsapp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contacts: selectedContacts.map((c) => ({
+          id: c.id,
+          phone: c.phone,
+          name: c.name,
+        })),
+        template: {
+          name: template.name,
+          language: template.language, // e.g. "en_US"
+          components: template.components, // Pass the complete components data
+          parameter_format: template.parameter_format, // Pass parameter format
+        },
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast(data.error || "Failed to send messages", "error");
+      return;
+    }
+
+    const { sent, failed, total } = data;
+    setShowTemplateModal(false);
+
+    if (failed === 0) {
+      showToast(
+        `✓ Sent "${template.name}" to ${sent} contact${sent !== 1 ? "s" : ""}`,
+        "success"
+      );
+    } else if (sent === 0) {
+      showToast(`Failed to send to all ${total} contacts`, "error");
+    } else {
+      showToast(
+        `Sent to ${sent}, failed for ${failed} contact${
+          failed !== 1 ? "s" : ""
+        }`,
+        "error"
+      );
     }
   };
 
@@ -604,25 +647,25 @@ export default function ContactManager() {
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-             {selIds.size > 0 && (
-    <>
-      <button
-        onClick={() => setShowTemplateModal(true)}
-        disabled={loading}
-        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-600/40 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        💬 {`Send Message (${selIds.size})`}
-      </button>
-      <button
-        onClick={deleteBulk}
-        disabled={loading}
-        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-600/40 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        🗑 {loading ? "Deleting..." : `Delete (${selIds.size})`}
-      </button>
-    </>
-  )}
-            
+            {selIds.size > 0 && (
+              <>
+                <button
+                  onClick={() => setShowTemplateModal(true)}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-600/40 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  💬 {`Send Message (${selIds.size})`}
+                </button>
+                <button
+                  onClick={deleteBulk}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-600/40 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  🗑 {loading ? "Deleting..." : `Delete (${selIds.size})`}
+                </button>
+              </>
+            )}
+
             <button
               onClick={() => setModal("import")}
               disabled={loading}
@@ -946,13 +989,13 @@ export default function ContactManager() {
           />
         </Modal>
       )}
-        {showTemplateModal && (
-    <TemplateModal
-      selectedCount={selIds.size}
-      onClose={() => setShowTemplateModal(false)}
-      onSend={handleSendMessage}
-    />
-  )}
+      {showTemplateModal && (
+        <TemplateModal
+          selectedCount={selIds.size}
+          onClose={() => setShowTemplateModal(false)}
+          onSend={handleSendMessage}
+        />
+      )}
 
       {toast && <Toast msg={toast.msg} type={toast.type} />}
     </div>

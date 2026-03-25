@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import TemplateCard from "./TemplateCard";
 
 const TemplateModal = ({ selectedCount, onClose, onSend }) => {
   const [templates, setTemplates] = useState([]);
@@ -39,18 +40,20 @@ const TemplateModal = ({ selectedCount, onClose, onSend }) => {
     },
   };
 
-  const CATEGORY_META = {
-    MARKETING: { icon: "📢", color: "text-pink-400" },
-    UTILITY: { icon: "⚙️", color: "text-sky-400" },
-    AUTHENTICATION: { icon: "🔐", color: "text-violet-400" },
-  };
-
-  const handleSend = async () => {
-    if (!selected) return;
-    setSending(true);
+ const handleSend = async () => {
+  if (!selected) return;
+  setSending(true);
+  try {
+    console.log("Selected template for sending:", selected);
     await onSend(selected);
+  } catch (error) {
+    console.error("Error sending message:", error);
+    // The error handling is done in the parent component (Contact.jsx)
+    // so we don't need to show additional errors here
+  } finally {
     setSending(false);
-  };
+  }
+};
 
   return (
     <div
@@ -109,73 +112,15 @@ const TemplateModal = ({ selectedCount, onClose, onSend }) => {
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">
-              {templates.map((t) => {
-                const statusM = STATUS_META[t.status] || STATUS_META.PENDING;
-                const catM = CATEGORY_META[t.category] || {
-                  icon: "📄",
-                  color: "text-gray-400",
-                };
-                const isSelected = selected?.id === t.id;
-                const bodyComp = t.components?.find((c) => c.type === "BODY");
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => setSelected(t)}
-                    className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all ${
-                      isSelected
-                        ? "border-emerald-500/60 bg-emerald-500/8 ring-1 ring-emerald-500/30"
-                        : "border-gray-700/60 bg-gray-800/30 hover:border-gray-600 hover:bg-gray-800/60"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {/* Radio indicator */}
-                        <div
-                          className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
-                            isSelected
-                              ? "border-emerald-400 bg-emerald-400"
-                              : "border-gray-600"
-                          }`}
-                        >
-                          {isSelected && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-gray-900" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-bold text-gray-100 font-mono tracking-tight">
-                              {t.name}
-                            </span>
-                            <span
-                              className={`text-xs font-semibold ${catM.color}`}
-                            >
-                              {catM.icon} {t.category}
-                            </span>
-                          </div>
-                          {bodyComp?.text && (
-                            <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-relaxed">
-                              {bodyComp.text}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                        <span
-                          className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${statusM.color}`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${statusM.dot}`}
-                          />
-                          {t.status}
-                        </span>
-                        <span className="text-xs text-gray-600 font-mono">
-                          {t.language}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+              {templates.map((t) => (
+                <TemplateCard
+                  key={t.id}
+                  template={t}
+                  isSelected={selected?.id === t.id}
+                  onSelect={setSelected}
+                  showDetails={true}
+                />
+              ))}
             </div>
           )}
         </div>
