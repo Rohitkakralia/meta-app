@@ -4,6 +4,7 @@ import Contact from "@/components/Contact";
 import Integrations from "@/components/Integration";
 import Campaign from "@/components/Campaign";
 import Templates from "@/components/Templates";
+import Inbox from "@/components/Inbox";
 
 // ─── Tab Components ───────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ const Settings = () => {
 // ─── Nav Config ───────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: "dashboard", label: "Dashboard", icon: "▣", component: Dashboard },
+  { id: "inbox", label: "Inbox", icon: "▣", component: Inbox },
   { id: "contacts",     label: "Contacts",     icon: "◎", component: Contact },
   { id: "integrations", label: "Integrations", icon: "△", component: Integrations },
   { id: "templates",    label: "Templates",    icon: "📄", component: () => <Templates /> },
@@ -134,10 +135,10 @@ const TABS = [
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function AdminPanel() {
-  const [active, setActive] = useState("dashboard");
+  const [active, setActive] = useState("Inbox");
   const [collapsed, setCollapsed] = useState(false);
 
-  const ActiveComponent = TABS.find((t) => t.id === active)?.component || Dashboard;
+  const ActiveComponent = TABS.find((t) => t.id === active)?.component || Inbox;
 
   return (
     <div className="flex h-screen bg-gray-900 text-gray-100 overflow-hidden">
