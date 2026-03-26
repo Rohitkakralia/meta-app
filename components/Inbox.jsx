@@ -60,12 +60,12 @@ const Inbox = () => {
     <div className="min-h-screen text-white font-sans">
 
       {/* Header */}
-      <div className="sticky top-0 z-10 px-5 pt-5">
+      <div className=" top-0 z-10 px-5 pt-5">
         <h1 className="text-2xl font-semibold">Messages</h1>
         <p className="text-xs text-gray-500 mb-4">{contacts.length} contacts</p>
 
         {/* Search */}
-        <div className="flex items-center gap-2 bg-[#16161e] border border-[#1e1e2a] rounded-xl px-3 py-2 mb-2">
+        <div className="flex items-center gap-2 bg-white text-black border border-[#1e1e2a] rounded-xl px-3 py-2 mb-2">
           <svg className="text-gray-500 w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.35-4.35" />
