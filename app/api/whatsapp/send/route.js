@@ -187,7 +187,13 @@ export async function POST(request) {
     const phoneNumberId = process.env.META_PHONE_NUMBER_ID;
     const accessToken = process.env.META_ACCESS_TOKEN;
 
+    console.log("[whatsapp/send] Environment check:", {
+      phoneNumberId: phoneNumberId ? "✅ Set" : "❌ Missing",
+      accessToken: accessToken ? "✅ Set" : "❌ Missing"
+    });
+
     if (!phoneNumberId || !accessToken) {
+      console.error("[whatsapp/send] Missing environment variables");
       return Response.json(
         { error: "Missing META_PHONE_NUMBER_ID or META_ACCESS_TOKEN env vars" },
         { status: 500 }
@@ -197,7 +203,9 @@ export async function POST(request) {
     let body;
     try {
       body = await request.json();
-    } catch {
+      console.log("[whatsapp/send] Request body:", body);
+    } catch (parseError) {
+      console.error("[whatsapp/send] JSON parse error:", parseError);
       return Response.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
@@ -295,17 +303,22 @@ export async function POST(request) {
 
         // Save outbound message to messageStore for text messages
         if (isTextMessage && result.messageId) {
-          const { messageStore } = await import("@/lib/messageStore");
-          messageStore.save({
-            id: result.messageId,
-            text: text,
-            type: "text",
-            direction: "outbound",
-            to: phone,
-            status: "sent",
-            timestamp: Date.now(),
-          });
-          console.log(`[whatsapp/send] Saved text message to store: ${result.messageId}`);
+          try {
+            const { messageStore } = await import("@/lib/messageStore");
+            messageStore.save({
+              id: result.messageId,
+              text: text,
+              type: "text",
+              direction: "outbound",
+              to: phone,
+              status: "sent",
+              timestamp: Date.now(),
+            });
+            console.log(`[whatsapp/send] Saved text message to store: ${result.messageId}`);
+          } catch (storeError) {
+            console.error(`[whatsapp/send] Failed to save to messageStore:`, storeError);
+            // Don't fail the whole request if messageStore fails
+          }
         }
 
         return result;
