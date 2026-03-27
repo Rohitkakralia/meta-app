@@ -209,6 +209,68 @@ const ChatRoom = ({ contact, onBack }) => {
           </div>
         )}
 
+        {/* Template Media Display */}
+        {msg.templateName && (msg.image || msg.video || msg.document) && (
+          <div className="mb-3">
+            {msg.image && msg.image.url && (
+              <img 
+                src={msg.image.url} 
+                alt="Template image"
+                className="max-w-full h-auto rounded-lg"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'block';
+                }}
+              />
+            )}
+            {msg.image && msg.image.url && (
+              <div className="hidden text-xs text-gray-400 bg-gray-700 p-2 rounded">
+                📷 Template Image (Unable to load)
+              </div>
+            )}
+            
+            {msg.video && msg.video.url && (
+              <video 
+                controls 
+                className="max-w-full h-auto rounded-lg"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'block';
+                }}
+              >
+                <source src={msg.video.url} type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            )}
+            {msg.video && msg.video.url && (
+              <div className="hidden text-xs text-gray-400 bg-gray-700 p-2 rounded">
+                🎬 Template Video (Unable to load)
+              </div>
+            )}
+            
+            {msg.document && msg.document.url && (
+              <div className="bg-gray-700 p-3 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📄</span>
+                  <div>
+                    <div className="text-sm font-medium">
+                      {msg.document.filename || 'Template Document'}
+                    </div>
+                    <a 
+                      href={msg.document.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-400 hover:text-blue-300"
+                    >
+                      Download Document
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Message content with proper line breaks for templates */}
         <div className="whitespace-pre-line">{msg.text}</div>
 

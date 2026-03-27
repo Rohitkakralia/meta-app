@@ -199,14 +199,8 @@ function buildTemplateDisplayText(template) {
             });
           }
           displayText += `📋 ${headerText}\n\n`;
-        } else if (["IMAGE", "VIDEO", "DOCUMENT"].includes(comp.format)) {
-          const mediaEmoji = {
-            IMAGE: "📷",
-            VIDEO: "🎬", 
-            DOCUMENT: "📄"
-          };
-          displayText += `${mediaEmoji[comp.format]} [${comp.format}]\n\n`;
         }
+        // Skip media headers since they'll be displayed as actual media
         break;
       }
       
@@ -415,19 +409,29 @@ export async function POST(request) {
                 buttonParams: template.buttonParams || []
               };
               
-              // Check if template has media components
+              // Check if template has media components and store the actual media URL
               let hasMedia = false;
               let mediaType = null;
+              let mediaUrl = null;
               
               for (const comp of template.components || []) {
                 if (comp.type === "HEADER" && ["IMAGE", "VIDEO", "DOCUMENT"].includes(comp.format)) {
                   hasMedia = true;
                   mediaType = comp.format.toLowerCase();
                   
-                  // Store media info in the message
+                  // Get the media URL from the template example
+                  const originalUrl = comp.example?.header_handle?.[0];
+                  
+                  // Create a proxy URL that our frontend can access
+                  mediaUrl = originalUrl ? `/api/template-media?url=${encodeURIComponent(originalUrl)}` : null;
+                  
+                  // Store media info in the message with the proxy URL
                   messageData[mediaType] = {
-                    id: "template_media", // We don't have the actual media_id here
-                    caption: comp.example?.header_text?.[0] || null
+                    id: "template_media",
+                    url: mediaUrl, // Store the proxy URL
+                    originalUrl: originalUrl, // Keep original for reference
+                    caption: comp.example?.header_text?.[0] || null,
+                    filename: comp.example?.header_text?.[0] || null // For documents
                   };
                   break;
                 }
