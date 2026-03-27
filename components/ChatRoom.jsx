@@ -204,12 +204,13 @@ const ChatRoom = ({ contact, onBack }) => {
       >
         {/* Template badge */}
         {msg.templateName && (
-          <div className="text-[10px] opacity-60 mb-1">
-            📄 {msg.templateName}
+          <div className="text-[10px] opacity-60 mb-2 flex items-center gap-1">
+            📄 Template: <span className="font-mono">{msg.templateName}</span>
           </div>
         )}
 
-        <div>{msg.text}</div>
+        {/* Message content with proper line breaks for templates */}
+        <div className="whitespace-pre-line">{msg.text}</div>
 
         <div className="flex items-center justify-between gap-2 text-[10px] text-gray-300 mt-1">
           <span>{msg.time}</span>

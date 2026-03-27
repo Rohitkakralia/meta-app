@@ -181,6 +181,91 @@ async function buildComponents(template, phoneNumberId, accessToken) {
   return components;
 }
 
+// ── Build full template display text ─────────────────────────────────────────
+function buildTemplateDisplayText(template) {
+  let displayText = "";
+  const components = template.components || [];
+  
+  // Process each component in order
+  for (const comp of components) {
+    switch (comp.type) {
+      case "HEADER": {
+        if (comp.format === "TEXT" && comp.text) {
+          // Replace placeholders with actual values
+          let headerText = comp.text;
+          if (template.headerText && template.headerText.length > 0) {
+            template.headerText.forEach((value, index) => {
+              headerText = headerText.replace(`{{${index + 1}}}`, value);
+            });
+          }
+          displayText += `📋 ${headerText}\n\n`;
+        } else if (["IMAGE", "VIDEO", "DOCUMENT"].includes(comp.format)) {
+          const mediaEmoji = {
+            IMAGE: "📷",
+            VIDEO: "🎬", 
+            DOCUMENT: "📄"
+          };
+          displayText += `${mediaEmoji[comp.format]} [${comp.format}]\n\n`;
+        }
+        break;
+      }
+      
+      case "BODY": {
+        if (comp.text) {
+          let bodyText = comp.text;
+          // Replace placeholders with actual values
+          if (template.bodyParams && template.bodyParams.length > 0) {
+            template.bodyParams.forEach((value, index) => {
+              bodyText = bodyText.replace(`{{${index + 1}}}`, value);
+            });
+          }
+          displayText += `${bodyText}\n\n`;
+        }
+        break;
+      }
+      
+      case "FOOTER": {
+        if (comp.text) {
+          displayText += `${comp.text}\n\n`;
+        }
+        break;
+      }
+      
+      case "BUTTONS": {
+        if (comp.buttons && comp.buttons.length > 0) {
+          displayText += "🔘 Buttons:\n";
+          comp.buttons.forEach((button, index) => {
+            switch (button.type) {
+              case "QUICK_REPLY":
+                displayText += `• ${button.text}\n`;
+                break;
+              case "URL":
+                let url = button.url;
+                if (template.buttonParams && template.buttonParams[index]) {
+                  url = url.replace(/\{\{1\}\}/, template.buttonParams[index]);
+                }
+                displayText += `• ${button.text}: ${url}\n`;
+                break;
+              case "PHONE_NUMBER":
+                displayText += `• ${button.text}: ${button.phone_number}\n`;
+                break;
+              case "COPY_CODE":
+                const code = template.buttonParams && template.buttonParams[index] 
+                  ? template.buttonParams[index] 
+                  : "[CODE]";
+                displayText += `• ${button.text}: ${code}\n`;
+                break;
+            }
+          });
+        }
+        break;
+      }
+    }
+  }
+  
+  return displayText.trim();
+}
+
 // ── Main POST handler ─────────────────────────────────────────────────────────
 export async function POST(request) {
   try {
@@ -318,9 +403,17 @@ export async function POST(request) {
             if (isTextMessage) {
               messageData.text = text;
             } else {
-              // For template messages, store template info and build display text
+              // For template messages, store template info and build full display text
               messageData.templateName = template.name;
               messageData.templateLanguage = template.language;
+              
+              // Store the full template structure for detailed display
+              messageData.templateComponents = template.components;
+              messageData.templateParams = {
+                headerText: template.headerText || [],
+                bodyParams: template.bodyParams || [],
+                buttonParams: template.buttonParams || []
+              };
               
               // Check if template has media components
               let hasMedia = false;
@@ -340,25 +433,8 @@ export async function POST(request) {
                 }
               }
               
-              // Create a readable text representation of the template
-              let displayText = "";
-              
-              if (hasMedia) {
-                // For media templates, show media type
-                const mediaEmoji = {
-                  image: "📷",
-                  video: "🎬", 
-                  document: "📄"
-                };
-                displayText = `${mediaEmoji[mediaType] || "📎"} Template: ${template.name}`;
-              } else {
-                displayText = `Template: ${template.name}`;
-              }
-              
-              // Add body parameters if any
-              if (template.bodyParams && template.bodyParams.length > 0) {
-                displayText += ` (${template.bodyParams.join(', ')})`;
-              }
+              // Build full template content display
+              let displayText = buildTemplateDisplayText(template);
               
               messageData.text = displayText;
               
