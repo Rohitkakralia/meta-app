@@ -27,7 +27,6 @@ export async function GET(request) {
 }
 
 // ── HANDLE WEBHOOK EVENTS (POST) ──────────────────────
-// ── HANDLE WEBHOOK EVENTS (POST) ──────────────────────
 export async function POST(request) {
   try {
     // BUG FIX 1: Verify HMAC signature before processing anything
