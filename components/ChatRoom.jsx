@@ -17,59 +17,146 @@ const ChatRoom = ({ contact, onBack }) => {
     { id: 2, text: "Hi! How are you?", sender: "me", time: "10:01 AM" },
   ]);
   const [input, setInput] = useState("");
+  const [sendError, setSendError] = useState(null);
   const bottomRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!input.trim()) return;
 
+    const messageText = input.trim();
+    const tempId = Date.now();
+
+    // Optimistic update
     const newMessage = {
-      id: Date.now(),
-      text: input,
+      id: tempId,
+      text: messageText,
       sender: "me",
       time: new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
       }),
+      status: "sending",
     };
 
     setMessages((prev) => [...prev, newMessage]);
     setInput("");
+    setSendError(null);
+
+    try {
+      const res = await fetch("/api/whatsapp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          // Wrap the single contact in an array to match the API's expected shape
+          contacts: [
+            {
+              id: contact.id,
+              phone: contact.phone,
+              name: contact.name,
+            },
+          ],
+          // Plain text messages don't use a template — send a text type instead
+          message: {
+            type: "text",
+            text: messageText,
+          },
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSendError(data.error || "Failed to send message");
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === tempId ? { ...msg, status: "failed" } : msg
+          )
+        );
+        return;
+      }
+
+      const { sent, failed } = data;
+
+      if (sent > 0) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === tempId ? { ...msg, status: "sent" } : msg
+          )
+        );
+      } else {
+        setSendError(failed > 0 ? "Message failed to deliver" : "Unknown error");
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === tempId ? { ...msg, status: "failed" } : msg
+          )
+        );
+      }
+    } catch (err) {
+      setSendError("Network error. Please try again.");
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === tempId ? { ...msg, status: "failed" } : msg
+        )
+      );
+    }
   };
 
-  const renderMessage = (msg) => {
-    return (
+  const getMessageStatusIcon = (status) => {
+    switch (status) {
+      case "sending":   return "⏳";
+      case "sent":      return "✓";
+      case "delivered": return "✓✓";
+      case "read":      return "✓✓";
+      case "failed":    return "❌";
+      default:          return "";
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "sending":   return "text-yellow-400";
+      case "sent":      return "text-gray-400";
+      case "delivered": return "text-blue-400";
+      case "read":      return "text-blue-400";
+      case "failed":    return "text-red-400";
+      default:          return "text-gray-400";
+    }
+  };
+
+  const renderMessage = (msg) => (
+    <div
+      key={msg.id}
+      className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
+    >
       <div
-        key={msg.id}
-        className={`flex ${
-          msg.sender === "me" ? "justify-end" : "justify-start"
-        }`}
+        className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm
+          ${
+            msg.sender === "me"
+              ? "bg-indigo-600 text-white rounded-br-md"
+              : "bg-[#16161e] text-gray-200 rounded-bl-md"
+          }`}
       >
-        <div
-          className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm
-            ${
-              msg.sender === "me"
-                ? "bg-indigo-600 text-white rounded-br-md"
-                : "bg-[#16161e] text-gray-200 rounded-bl-md"
-            }`}
-        >
-          {msg.text}
-          <div className="text-[10px] text-gray-300 mt-1 text-right">
-            {msg.time}
-          </div>
+        {msg.text}
+        <div className="flex items-center justify-between text-[10px] text-gray-300 mt-1">
+          <span>{msg.time}</span>
+          {msg.sender === "me" && msg.status && (
+            <span className={`ml-2 ${getStatusColor(msg.status)}`}>
+              {getMessageStatusIcon(msg.status)}
+            </span>
+          )}
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-[80vh] text-white">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b">
-        {/* Back button */}
         <button
           onClick={onBack}
           className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#16161e] transition text-gray-400"
@@ -106,6 +193,13 @@ const ChatRoom = ({ contact, onBack }) => {
         {messages.map(renderMessage)}
         <div ref={bottomRef} />
       </div>
+
+      {/* Error banner */}
+      {sendError && (
+        <div className="px-4 py-2 bg-red-900/30 border-t border-red-700 text-xs text-red-300">
+          {sendError}
+        </div>
+      )}
 
       {/* Input */}
       <div className="p-3 border-t border-[#1e1e2a]">
