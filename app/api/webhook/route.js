@@ -27,95 +27,90 @@ export async function GET(request) {
 }
 
 // ── HANDLE WEBHOOK EVENTS (POST) ──────────────────────
+// ── HANDLE WEBHOOK EVENTS (POST) ──────────────────────
 export async function POST(request) {
   try {
-    const payload = await request.json();
+    // BUG FIX 1: Verify HMAC signature before processing anything
+    const rawBody = await request.text();
+    const sig = request.headers.get("x-hub-signature-256");
 
-    console.log("FULL PAYLOAD:", JSON.stringify(payload, null, 2));
+    if (sig) {
+      const { createHmac } = await import("crypto");
+      const expected = "sha256=" + createHmac("sha256", process.env.META_APP_SECRET)
+        .update(rawBody)
+        .digest("hex");
+
+      if (sig !== expected) {
+        return new Response("Forbidden", { status: 403 });
+      }
+    }
+
+    const payload = JSON.parse(rawBody);
 
     if (payload.object !== "whatsapp_business_account") {
       return new Response("Not WhatsApp Event", { status: 200 });
     }
 
-    payload.entry?.forEach((entry) => {
-      entry.changes?.forEach((change) => {
+    // BUG FIX 2: Collect all async work and await it before returning
+    const tasks = [];
+
+    for (const entry of payload.entry ?? []) {
+      for (const change of entry.changes ?? []) {
 
         if (change.field === "messages") {
           const value = change.value;
 
-          // 📩 Incoming messages
+          // BUG FIX 3: Use for...of instead of forEach so await works correctly
           if (value.messages) {
-            value.messages.forEach(async (msg) => {
-              console.log("📩 New Message:", msg.text?.body || msg.interactive?.button_reply?.title || "Media message");
-              console.log("From:", msg.from);
-              console.log("Message ID:", msg.id);
-              console.log("Timestamp:", msg.timestamp);
-              
+            for (const msg of value.messages) {
               const incomingMessage = {
                 id: msg.id,
                 from: msg.from,
                 to: value.metadata?.phone_number_id,
                 text: msg.text?.body || msg.interactive?.button_reply?.title || "",
                 type: msg.type,
-                timestamp: parseInt(msg.timestamp) * 1000, // Convert to milliseconds
+                timestamp: parseInt(msg.timestamp) * 1000,
                 context: msg.context,
                 interactive: msg.interactive,
                 media: msg.image || msg.video || msg.audio || msg.document,
-                contacts: value.contacts?.[0] // Contact info if available
+                contacts: value.contacts?.[0],
               };
-              
-              // Process the incoming message
-              await processIncomingMessage(incomingMessage);
-            });
+              tasks.push(processIncomingMessage(incomingMessage));
+            }
           }
 
-          // 📊 Status updates (delivery receipts)
           if (value.statuses) {
-            value.statuses.forEach(async (status) => {
-              console.log("📊 Message Status Update:");
-              console.log("  Message ID:", status.id);
-              console.log("  Status:", status.status);
-              console.log("  Recipient:", status.recipient_id);
-              console.log("  Timestamp:", status.timestamp);
-              
+            for (const status of value.statuses) {
               const statusUpdate = {
                 messageId: status.id,
                 recipientId: status.recipient_id,
-                status: status.status, // sent, delivered, read, failed
+                status: status.status,
                 timestamp: parseInt(status.timestamp) * 1000,
-                errors: status.errors
+                errors: status.errors,
               };
-              
-              // Process the status update
-              await processMessageStatus(statusUpdate);
-            });
+              tasks.push(processMessageStatus(statusUpdate));
+            }
           }
         }
 
-        // 📄 Template updates (v24.0)
-        if (change.field === "message_template_status_update") {
-          console.log("📄 Template Update (v24.0):", change.value);
-          
-          // Process template status update
-          if (change.value) {
-            const templateUpdate = {
-              messageTemplateId: change.value.message_template_id,
-              messageTemplateName: change.value.message_template_name,
-              messageTemplateLanguage: change.value.message_template_language,
-              previousStatus: change.value.previous_status,
-              newStatus: change.value.new_status,
-              reason: change.value.reason,
-              timestamp: new Date().toISOString(),
-              version: "v24.0"
-            };
-            
-            // Process the template status update
-            processTemplateStatusUpdate(templateUpdate);
-          }
+        if (change.field === "message_template_status_update" && change.value) {
+          const templateUpdate = {
+            messageTemplateId: change.value.message_template_id,
+            messageTemplateName: change.value.message_template_name,
+            messageTemplateLanguage: change.value.message_template_language,
+            previousStatus: change.value.previous_status,
+            newStatus: change.value.new_status,
+            reason: change.value.reason,
+            timestamp: new Date().toISOString(),
+            version: "v24.0",
+          };
+          tasks.push(processTemplateStatusUpdate(templateUpdate));
         }
+      }
+    }
 
-      });
-    });
+    // Await everything before returning 200
+    await Promise.allSettled(tasks);
 
     return new Response("EVENT_RECEIVED", { status: 200 });
 
