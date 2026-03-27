@@ -542,7 +542,7 @@ export default function ContactManager() {
   const handleSendMessage = async (template) => {
     // Get the full contact objects for selected IDs
     const selectedContacts = contacts.filter((c) => selIds.has(c.id));
-
+    
     const res = await fetch("/api/whatsapp/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

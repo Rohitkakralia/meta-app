@@ -301,20 +301,75 @@ export async function POST(request) {
           messageId: data?.messages?.[0]?.id ?? null,
         };
 
-        // Save outbound message to messageStore for text messages
-        if (isTextMessage && result.messageId) {
+        // Save outbound message to messageStore for both text and template messages
+        if (result.messageId) {
           try {
             const { messageStore } = await import("@/lib/messageStore");
-            messageStore.save({
+            
+            const messageData = {
               id: result.messageId,
-              text: text,
-              type: "text",
+              type: isTextMessage ? "text" : "template",
               direction: "outbound",
               to: phone,
               status: "sent",
               timestamp: Date.now(),
-            });
-            console.log(`[whatsapp/send] Saved text message to store: ${result.messageId}`);
+            };
+
+            if (isTextMessage) {
+              messageData.text = text;
+            } else {
+              // For template messages, store template info and build display text
+              messageData.templateName = template.name;
+              messageData.templateLanguage = template.language;
+              
+              // Check if template has media components
+              let hasMedia = false;
+              let mediaType = null;
+              
+              for (const comp of template.components || []) {
+                if (comp.type === "HEADER" && ["IMAGE", "VIDEO", "DOCUMENT"].includes(comp.format)) {
+                  hasMedia = true;
+                  mediaType = comp.format.toLowerCase();
+                  
+                  // Store media info in the message
+                  messageData[mediaType] = {
+                    id: "template_media", // We don't have the actual media_id here
+                    caption: comp.example?.header_text?.[0] || null
+                  };
+                  break;
+                }
+              }
+              
+              // Create a readable text representation of the template
+              let displayText = "";
+              
+              if (hasMedia) {
+                // For media templates, show media type
+                const mediaEmoji = {
+                  image: "📷",
+                  video: "🎬", 
+                  document: "📄"
+                };
+                displayText = `${mediaEmoji[mediaType] || "📎"} Template: ${template.name}`;
+              } else {
+                displayText = `Template: ${template.name}`;
+              }
+              
+              // Add body parameters if any
+              if (template.bodyParams && template.bodyParams.length > 0) {
+                displayText += ` (${template.bodyParams.join(', ')})`;
+              }
+              
+              messageData.text = displayText;
+              
+              // Set the message type to the media type if it has media
+              if (hasMedia) {
+                messageData.type = mediaType;
+              }
+            }
+
+            messageStore.save(messageData);
+            console.log(`[whatsapp/send] Saved ${isTextMessage ? 'text' : 'template'} message to store: ${result.messageId}`);
           } catch (storeError) {
             console.error(`[whatsapp/send] Failed to save to messageStore:`, storeError);
             // Don't fail the whole request if messageStore fails

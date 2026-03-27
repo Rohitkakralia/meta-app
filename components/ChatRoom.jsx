@@ -24,10 +24,24 @@ const normalizeMessage = (msg) => ({
   timestamp: msg.timestamp,
   type:      msg.type ?? "text",
   templateName: msg.templateName ?? null,
+  // Pass through media properties for template messages
+  image:     msg.image ?? null,
+  video:     msg.video ?? null,
+  document:  msg.document ?? null,
+  audio:     msg.audio ?? null,
 });
 
 // Fallback label for non-text messages (image, audio, etc.)
 const getMediaLabel = (msg) => {
+  // For template messages, show template name with media type
+  if (msg.templateName) {
+    if (msg.image)    return `📷 Template: ${msg.templateName}`;
+    if (msg.video)    return `🎬 Template: ${msg.templateName}`;
+    if (msg.document) return `📄 Template: ${msg.templateName}`;
+    return `📄 Template: ${msg.templateName}`;
+  }
+  
+  // For regular media messages
   if (msg.image)    return "📷 Image";
   if (msg.audio)    return "🎵 Audio";
   if (msg.video)    return "🎬 Video";
