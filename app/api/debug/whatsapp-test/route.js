@@ -1,8 +1,8 @@
 // Debug endpoint to test WhatsApp API credentials
 export async function GET() {
   try {
-    const phoneNumberId = process.env.META_PHONE_NUMBER_ID;
-    const accessToken = process.env.META_ACCESS_TOKEN;
+    const phoneNumberId = process.env.PHONE_NUMBER_ID;
+    const accessToken = process.env.ACCESS_TOKEN;
 
     console.log("[debug] Environment variables:", {
       phoneNumberId: phoneNumberId ? "✅ Set" : "❌ Missing",

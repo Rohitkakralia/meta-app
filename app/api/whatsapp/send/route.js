@@ -184,8 +184,8 @@ async function buildComponents(template, phoneNumberId, accessToken) {
 // ── Main POST handler ─────────────────────────────────────────────────────────
 export async function POST(request) {
   try {
-    const phoneNumberId = process.env.META_PHONE_NUMBER_ID;
-    const accessToken = process.env.META_ACCESS_TOKEN;
+    const phoneNumberId = process.env.PHONE_NUMBER_ID;
+    const accessToken = process.env.ACCESS_TOKEN;
 
     console.log("[whatsapp/send] Environment check:", {
       phoneNumberId: phoneNumberId ? "✅ Set" : "❌ Missing",
@@ -195,7 +195,7 @@ export async function POST(request) {
     if (!phoneNumberId || !accessToken) {
       console.error("[whatsapp/send] Missing environment variables");
       return Response.json(
-        { error: "Missing META_PHONE_NUMBER_ID or META_ACCESS_TOKEN env vars" },
+        { error: "Missing PHONE_NUMBER_ID or ACCESS_TOKEN env vars" },
         { status: 500 }
       );
     }
