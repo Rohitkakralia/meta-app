@@ -14,7 +14,7 @@ const getInitials = (name) => {
 // Normalize a message from the conversation API into UI shape
 const normalizeMessage = (msg) => ({
   id:        msg.id,
-  text:      msg.text ?? getMediaLabel(msg),
+  text:      msg.text || (msg.type === "text" ? "[Message content unavailable]" : getMediaLabel(msg)),
   sender:    msg.direction === "outbound" ? "me" : "other",
   time:      new Date(msg.timestamp).toLocaleTimeString([], {
     hour: "2-digit",
@@ -61,6 +61,9 @@ const ChatRoom = ({ contact, onBack }) => {
       const data = await res.json();
 
       if (res.ok && Array.isArray(data.messages)) {
+        // Debug: log raw messages to see what we're getting
+        console.log("[ChatRoom] Raw messages from API:", data.messages);
+        
         const normalized = data.messages.map(normalizeMessage);
         setMessages((prev) => {
           // Only update if something actually changed (avoid flicker)

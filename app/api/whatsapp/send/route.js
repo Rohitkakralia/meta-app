@@ -184,12 +184,12 @@ async function buildComponents(template, phoneNumberId, accessToken) {
 // ── Main POST handler ─────────────────────────────────────────────────────────
 export async function POST(request) {
   try {
-    const phoneNumberId = process.env.PHONE_NUMBER_ID;
-    const accessToken = process.env.ACCESS_TOKEN;
+    const phoneNumberId = process.env.META_PHONE_NUMBER_ID;
+    const accessToken = process.env.META_ACCESS_TOKEN;
 
     if (!phoneNumberId || !accessToken) {
       return Response.json(
-        { error: "Missing PHONE_NUMBER_ID or ACCESS_TOKEN env vars" },
+        { error: "Missing META_PHONE_NUMBER_ID or META_ACCESS_TOKEN env vars" },
         { status: 500 }
       );
     }
@@ -201,7 +201,7 @@ export async function POST(request) {
       return Response.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { contacts, template } = body;
+    const { contacts, template, text } = body;
 
     if (!Array.isArray(contacts) || contacts.length === 0) {
       return Response.json(
@@ -209,31 +209,38 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-    if (!template?.name || !template?.language) {
+
+    // Support both template messages and regular text messages
+    const isTextMessage = !!text;
+    const isTemplateMessage = !!template?.name && !!template?.language;
+
+    if (!isTextMessage && !isTemplateMessage) {
       return Response.json(
-        { error: "template.name and template.language are required" },
+        { error: "Either 'text' or 'template' (with name and language) is required" },
         { status: 400 }
       );
     }
 
     console.log(
-      `[whatsapp/send] "${template.name}" (${template.language}) → ${contacts.length} contact(s)`
+      `[whatsapp/send] ${isTextMessage ? `Text: "${text}"` : `Template: "${template.name}" (${template.language})`} → ${contacts.length} contact(s)`
     );
 
-    // ── Build components once — media is uploaded once and reused for all contacts ──
+    // ── Build components for template messages only ──
     let components = [];
-    try {
-      components = await buildComponents(template, phoneNumberId, accessToken);
-      console.log(
-        "[whatsapp/send] Final components:",
-        JSON.stringify(components, null, 2)
-      );
-    } catch (err) {
-      console.error("[whatsapp/send] Component build error:", err.message);
-      return Response.json(
-        { error: `Media processing error: ${err.message}` },
-        { status: 500 }
-      );
+    if (isTemplateMessage) {
+      try {
+        components = await buildComponents(template, phoneNumberId, accessToken);
+        console.log(
+          "[whatsapp/send] Final components:",
+          JSON.stringify(components, null, 2)
+        );
+      } catch (err) {
+        console.error("[whatsapp/send] Component build error:", err.message);
+        return Response.json(
+          { error: `Media processing error: ${err.message}` },
+          { status: 500 }
+        );
+      }
     }
 
     // ── Send to all contacts in parallel ──────────────────────────────────────
@@ -243,16 +250,24 @@ export async function POST(request) {
       contacts.map(async (contact) => {
         const phone = normalizePhone(contact.phone);
 
-        const payload = {
-          messaging_product: "whatsapp",
-          to: phone,
-          type: "template",
-          template: {
-            name: template.name,
-            language: { code: template.language },
-            ...(components.length > 0 ? { components } : {}),
-          },
-        };
+        // Build payload based on message type
+        const payload = isTextMessage
+          ? {
+              messaging_product: "whatsapp",
+              to: phone,
+              type: "text",
+              text: { body: text },
+            }
+          : {
+              messaging_product: "whatsapp",
+              to: phone,
+              type: "template",
+              template: {
+                name: template.name,
+                language: { code: template.language },
+                ...(components.length > 0 ? { components } : {}),
+              },
+            };
 
         const res = await fetch(fbUrl, {
           method: "POST",
@@ -270,13 +285,30 @@ export async function POST(request) {
           throw new Error(msg);
         }
 
-        return {
+        const result = {
           contactId: contact.id,
           phone,
           name: contact.name,
           success: true,
           messageId: data?.messages?.[0]?.id ?? null,
         };
+
+        // Save outbound message to messageStore for text messages
+        if (isTextMessage && result.messageId) {
+          const { messageStore } = await import("@/lib/messageStore");
+          messageStore.save({
+            id: result.messageId,
+            text: text,
+            type: "text",
+            direction: "outbound",
+            to: phone,
+            status: "sent",
+            timestamp: Date.now(),
+          });
+          console.log(`[whatsapp/send] Saved text message to store: ${result.messageId}`);
+        }
+
+        return result;
       })
     );
 
