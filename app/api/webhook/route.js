@@ -110,7 +110,7 @@ export async function POST(request) {
             };
             
             // Process the template status update
-            await processTemplateStatusUpdate(templateUpdate);
+            processTemplateStatusUpdate(templateUpdate);
           }
         }
 
