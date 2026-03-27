@@ -63,6 +63,57 @@ export default function TestWhatsAppPage() {
     }
   };
 
+  const testTemplateMessage = async () => {
+    try {
+      addLog("Testing template message integration...");
+      
+      const res = await fetch("/api/whatsapp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contacts: [
+            {
+              id: "test_contact_1",
+              phone: "1234567890",
+              name: "Test User"
+            }
+          ],
+          template: {
+            name: "welcome_message_test",
+            language: "en_US",
+            components: [
+              {
+                type: "HEADER",
+                format: "TEXT",
+                text: "Welcome to Our Service!"
+              },
+              {
+                type: "BODY",
+                text: "Hello, thank you for joining us. We're excited to have you on board!"
+              },
+              {
+                type: "FOOTER",
+                text: "Best regards, Your Team"
+              }
+            ]
+          }
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.sent > 0) {
+        addLog(`✅ Template message sent successfully to ${data.sent} contact(s)`, "success");
+        addLog("Check the inbox to see the template message in conversation history", "info");
+      } else {
+        addLog(`❌ Failed to send template message: ${data.error || "Unknown error"}`, "error");
+      }
+      
+    } catch (error) {
+      addLog(`Template test error: ${error.message}`, "error");
+    }
+  };
+
   const clearLogs = () => {
     setLogs([]);
   };
@@ -177,19 +228,42 @@ export default function TestWhatsAppPage() {
         {/* Quick Actions */}
         <div className="mt-6 bg-gray-900 border border-gray-800 rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-          <div className="flex gap-3">
-            <a 
-              href="/integrations" 
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm"
-            >
-              Go to Integrations
-            </a>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm"
-            >
-              Reload Page
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-gray-400">Navigation</h3>
+              <div className="flex gap-3">
+                <a 
+                  href="/user-dashboard" 
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm"
+                >
+                  Go to Dashboard
+                </a>
+                <a 
+                  href="/setup" 
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm"
+                >
+                  API Setup
+                </a>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-gray-400">Testing</h3>
+              <div className="flex gap-3">
+                <button 
+                  onClick={testTemplateMessage}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-sm"
+                >
+                  Test Template
+                </button>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm"
+                >
+                  Reload Page
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

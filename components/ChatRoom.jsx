@@ -69,6 +69,9 @@ const ChatRoom = ({ contact, onBack }) => {
           }),
           status: msg.status,
           timestamp: msg.timestamp,
+          type: msg.type || "text", // Include message type
+          templateName: msg.templateName,
+          templateLanguage: msg.templateLanguage
         }));
         setMessages(formattedMessages);
       } else {
@@ -106,6 +109,9 @@ const ChatRoom = ({ contact, onBack }) => {
             }),
             status: msg.status,
             timestamp: msg.timestamp,
+            type: msg.type || "text", // Include message type
+            templateName: msg.templateName,
+            templateLanguage: msg.templateLanguage
           }));
 
           // Only update if messages changed
@@ -288,6 +294,9 @@ const ChatRoom = ({ contact, onBack }) => {
       );
     }
 
+    // Check if this is a template message
+    const isTemplate = msg.type === "template" || msg.text?.startsWith("📄 Template:");
+
     return (
       <div
         key={msg.id}
@@ -299,11 +308,26 @@ const ChatRoom = ({ contact, onBack }) => {
           className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm
             ${
               msg.sender === "me"
-                ? "bg-indigo-600 text-white rounded-br-md"
+                ? isTemplate 
+                  ? "bg-green-600 text-white rounded-br-md border border-green-500/30"
+                  : "bg-indigo-600 text-white rounded-br-md"
                 : "bg-[#16161e] text-gray-200 rounded-bl-md"
             }`}
         >
-          {msg.text}
+          {isTemplate && msg.templateName && (
+            <div className="text-xs opacity-75 mb-1 flex items-center gap-1">
+              <span>📄</span>
+              <span>Template: {msg.templateName}</span>
+              {msg.templateLanguage && (
+                <span className="text-xs opacity-60">({msg.templateLanguage})</span>
+              )}
+            </div>
+          )}
+          
+          <div className={isTemplate ? "whitespace-pre-line" : ""}>
+            {msg.text}
+          </div>
+          
           <div className="flex items-center justify-between text-[10px] text-gray-300 mt-1">
             <span>{msg.time}</span>
             {msg.sender === "me" && msg.status && (

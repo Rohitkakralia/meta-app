@@ -66,7 +66,78 @@ async function uploadToWhatsApp(buffer, contentType, phoneNumberId, accessToken)
   return data.id; // WhatsApp media_id — valid for ~30 days
 }
 
-// ── Build WhatsApp API components from template data ─────────────────────────
+// ── Create readable template message text for conversation history ──────────
+function createTemplateMessageText(template) {
+  let messageText = `📄 Template: ${template.name}`;
+  
+  // Extract text content from template components
+  const textParts = [];
+  
+  for (const comp of template.components || []) {
+    switch (comp.type) {
+      case "HEADER":
+        if (comp.format === "TEXT" && comp.text) {
+          // Replace variables with actual values if provided
+          let headerText = comp.text;
+          if (template.headerText) {
+            template.headerText.forEach((value, index) => {
+              headerText = headerText.replace(`{{${index + 1}}}`, value);
+            });
+          }
+          textParts.push(`*${headerText}*`);
+        } else if (["IMAGE", "VIDEO", "DOCUMENT"].includes(comp.format)) {
+          textParts.push(`[${comp.format}]`);
+        }
+        break;
+        
+      case "BODY":
+        if (comp.text) {
+          let bodyText = comp.text;
+          // Replace variables with actual values if provided
+          if (template.bodyParams) {
+            template.bodyParams.forEach((value, index) => {
+              bodyText = bodyText.replace(`{{${index + 1}}}`, value);
+            });
+          }
+          textParts.push(bodyText);
+        }
+        break;
+        
+      case "FOOTER":
+        if (comp.text) {
+          textParts.push(`_${comp.text}_`);
+        }
+        break;
+        
+      case "BUTTONS":
+        if (comp.buttons && comp.buttons.length > 0) {
+          const buttonTexts = comp.buttons.map(btn => {
+            if (btn.type === "URL" && btn.url) {
+              let url = btn.url;
+              if (template.buttonParams) {
+                template.buttonParams.forEach((value, index) => {
+                  url = url.replace(`{{${index + 1}}}`, value);
+                });
+              }
+              return `🔗 ${btn.text}: ${url}`;
+            } else if (btn.type === "PHONE_NUMBER") {
+              return `📞 ${btn.text}: ${btn.phone_number}`;
+            } else {
+              return `• ${btn.text}`;
+            }
+          });
+          textParts.push(buttonTexts.join('\n'));
+        }
+        break;
+    }
+  }
+  
+  if (textParts.length > 0) {
+    messageText += '\n\n' + textParts.join('\n\n');
+  }
+  
+  return messageText;
+}
 // Handles: IMAGE/VIDEO/DOCUMENT headers (auto-upload), TEXT headers with vars,
 //          BODY with vars, dynamic URL buttons, COPY_CODE buttons.
 async function buildComponents(template, phoneNumberId, accessToken) {
@@ -256,7 +327,7 @@ export async function POST(request) {
       })
     );
 
-    // ── Aggregate results ──────────────────────────────────────────────────────
+    // ── Aggregate results and store in conversation history ──────────────────────
     const summary = rawResults.map((r, i) =>
       r.status === "fulfilled"
         ? r.value
@@ -271,6 +342,39 @@ export async function POST(request) {
 
     const sent   = summary.filter((r) => r.success).length;
     const failed = summary.filter((r) => !r.success).length;
+
+    // Store successful template messages in conversation history
+    for (const result of summary) {
+      if (result.success) {
+        try {
+          // Create a readable template message text
+          const templateText = createTemplateMessageText(template);
+          
+          // Store in conversation history
+          await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/messages/conversation`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phoneNumber: result.phone,
+              message: {
+                id: result.messageId || `template_${Date.now()}_${result.contactId}`,
+                text: templateText,
+                sender: "me",
+                timestamp: Date.now(),
+                status: "sent",
+                type: "template",
+                templateName: template.name,
+                templateLanguage: template.language
+              }
+            })
+          });
+          
+          console.log(`📱 Stored template message for ${result.name} (${result.phone})`);
+        } catch (storeError) {
+          console.error(`Failed to store template message for ${result.phone}:`, storeError);
+        }
+      }
+    }
 
     if (failed > 0) {
       console.warn("[whatsapp/send] Failures:", summary.filter((r) => !r.success));
