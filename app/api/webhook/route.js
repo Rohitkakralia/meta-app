@@ -134,10 +134,12 @@ function handleStatus(status) {
   if (!updated) {
     // Message wasn't in store (sent before server restart, or from bulk sender)
     // Insert a skeleton so the conversation API still returns something
+    // Try to determine if this might be a template message based on the message ID pattern
+    // Template messages often have different characteristics, but we can't know for sure
     messageStore.save({
       id:        status.id,
-      text:      null,              // body unknown — not sent via this server session
-      type:      "text",
+      text:      "[Message sent before server restart]", // More descriptive text
+      type:      "text", // Default to text since we don't know the actual type
       direction: "outbound",
       to:        status.recipient_id,
       status:    status.status,

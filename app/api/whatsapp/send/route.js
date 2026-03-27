@@ -370,6 +370,7 @@ export async function POST(request) {
 
             messageStore.save(messageData);
             console.log(`[whatsapp/send] Saved ${isTextMessage ? 'text' : 'template'} message to store: ${result.messageId}`);
+            console.log(`[whatsapp/send] Message data:`, JSON.stringify(messageData, null, 2));
           } catch (storeError) {
             console.error(`[whatsapp/send] Failed to save to messageStore:`, storeError);
             // Don't fail the whole request if messageStore fails
