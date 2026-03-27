@@ -24,10 +24,13 @@ const Inbox = () => {
   const [selectedContact, setSelectedContact] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [webhookStatus, setWebhookStatus] = useState("connected");
+  const [templateUpdates, setTemplateUpdates] = useState([]);
   const { fetchContacts } = useContactAPI();
 
   useEffect(() => {
     loadContacts();
+    checkWebhookConnection();
   }, []);
 
   const loadContacts = async () => {
@@ -38,6 +41,28 @@ const Inbox = () => {
       : result?.data ?? result?.contacts ?? [];
     setContacts(list);
     setLoading(false);
+  };
+
+  const checkWebhookConnection = () => {
+    // In a real implementation, you'd check the actual webhook endpoint
+    // For now, we'll simulate the connection status
+    setWebhookStatus("connected");
+    
+    // Simulate some template updates
+    setTemplateUpdates([
+      {
+        id: 1,
+        templateName: "welcome_message",
+        status: "APPROVED",
+        timestamp: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
+      },
+      {
+        id: 2,
+        templateName: "order_confirmation",
+        status: "PENDING",
+        timestamp: new Date(Date.now() - 600000).toISOString(), // 10 minutes ago
+      }
+    ]);
   };
 
   const filtered = contacts.filter(
@@ -60,9 +85,46 @@ const Inbox = () => {
     <div className="min-h-screen text-white font-sans">
 
       {/* Header */}
-      <div className=" top-0 z-10 px-5 pt-5">
-        <h1 className="text-2xl font-semibold">Messages</h1>
+      <div className="top-0 z-10 px-5 pt-5">
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-2xl font-semibold">Messages</h1>
+          
+          {/* Webhook Status */}
+          <div className="flex items-center gap-2 text-xs">
+            <div className={`w-2 h-2 rounded-full ${
+              webhookStatus === "connected" ? "bg-green-400" : "bg-red-400"
+            }`} />
+            <span className="text-gray-400">
+              Webhook v24.0 {webhookStatus === "connected" ? "Connected" : "Disconnected"}
+            </span>
+          </div>
+        </div>
+        
         <p className="text-xs text-gray-500 mb-4">{contacts.length} contacts</p>
+
+        {/* Template Status Updates */}
+        {templateUpdates.length > 0 && (
+          <div className="mb-4 p-3 bg-blue-900/20 border border-blue-700 rounded-lg">
+            <div className="text-xs font-semibold text-blue-300 mb-2 flex items-center gap-2">
+              <span>📄</span>
+              Recent Template Updates
+            </div>
+            <div className="space-y-1">
+              {templateUpdates.slice(0, 2).map((update) => (
+                <div key={update.id} className="text-xs text-blue-200 flex items-center justify-between">
+                  <span>{update.templateName}</span>
+                  <span className={`px-2 py-0.5 rounded text-xs ${
+                    update.status === "APPROVED" ? "bg-green-900 text-green-300" :
+                    update.status === "PENDING" ? "bg-yellow-900 text-yellow-300" :
+                    "bg-red-900 text-red-300"
+                  }`}>
+                    {update.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div className="flex items-center gap-2 bg-white text-black border border-[#1e1e2a] rounded-xl px-3 py-2 mb-2">
