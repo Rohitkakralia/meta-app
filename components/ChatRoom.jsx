@@ -166,7 +166,7 @@ const ChatRoom = ({ contact, onBack }) => {
       case "sending":   return "text-yellow-400";
       case "sent":      return "text-gray-400";
       case "delivered": return "text-blue-400";
-      case "read":      return "text-blue-400";
+      case "read":      return "text-green-400"; // Green for read to distinguish from delivered
       case "failed":    return "text-red-400";
       default:          return "text-gray-400";
     }
