@@ -575,11 +575,14 @@ const ChatRoom = ({ contact, onBack }) => {
         <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-2">
           {/* Media Upload Button */}
           <button
-            
             className="text-gray-500 cursor-pointer hover:text-gray-700 p-1 rounded transition"
             title="Attach media"
           >
-            <FileAttachIcon size={20} color="#4F46E5"  onClick={() => fileInputRef.current?.click()}/>
+            <FileAttachIcon
+              size={20}
+              color="#4F46E5"
+              onClick={() => fileInputRef.current?.click()}
+            />
           </button>
 
           {/* Emoji Picker Button with dark theme */}
