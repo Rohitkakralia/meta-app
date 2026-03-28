@@ -18,6 +18,14 @@ function normalizePhone(phone) {
   return phone.replace(/[\s\-()+]/g, "");
 }
 
+// ── Get media type from MIME type ─────────────────────────────────────────────
+function getMediaType(mimeType) {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("audio/")) return "audio";
+  return "document";
+}
+
 // ── Download media from Facebook CDN (requires auth) ─────────────────────────
 async function downloadMediaFromCDN(url, accessToken) {
   const res = await fetch(url, {
@@ -71,6 +79,47 @@ async function uploadToWhatsApp(
   }
 
   return data.id; // WhatsApp media_id — valid for ~30 days
+}
+
+// ── Upload media file to WhatsApp ─────────────────────────────────────────────
+async function uploadMediaFile(mediaData, phoneNumberId, accessToken) {
+  try {
+    // Decode base64 data
+    const base64Data = mediaData.file.split(",")[1]; // Remove data:image/jpeg;base64, prefix
+    const buffer = Buffer.from(base64Data, "base64");
+
+    const blob = new Blob([buffer], { type: mediaData.type });
+    const form = new FormData();
+    form.append("messaging_product", "whatsapp");
+    form.append("type", mediaData.type);
+    form.append(
+      "file",
+      blob,
+      mediaData.filename || `upload.${mediaData.type.split("/")[1]}`
+    );
+
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/${phoneNumberId}/media`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: form,
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok || !data.id) {
+      const msg =
+        data?.error?.message || `Media upload failed: HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+
+    return data.id; // WhatsApp media_id
+  } catch (error) {
+    console.error("[whatsapp/send] Media upload error:", error);
+    throw error;
+  }
 }
 
 // ── Build WhatsApp API components from template data ─────────────────────────
@@ -185,7 +234,7 @@ async function buildComponents(template, phoneNumberId, accessToken) {
 function buildTemplateDisplayText(template) {
   let displayText = "";
   const components = template.components || [];
-  
+
   // Process each component in order
   for (const comp of components) {
     switch (comp.type) {
@@ -203,7 +252,7 @@ function buildTemplateDisplayText(template) {
         // Skip media headers since they'll be displayed as actual media
         break;
       }
-      
+
       case "BODY": {
         if (comp.text) {
           let bodyText = comp.text;
@@ -217,14 +266,14 @@ function buildTemplateDisplayText(template) {
         }
         break;
       }
-      
+
       case "FOOTER": {
         if (comp.text) {
           displayText += `${comp.text}\n\n`;
         }
         break;
       }
-      
+
       case "BUTTONS": {
         if (comp.buttons && comp.buttons.length > 0) {
           displayText += "🔘 Buttons:\n";
@@ -244,9 +293,10 @@ function buildTemplateDisplayText(template) {
                 displayText += `• ${button.text}: ${button.phone_number}\n`;
                 break;
               case "COPY_CODE":
-                const code = template.buttonParams && template.buttonParams[index] 
-                  ? template.buttonParams[index] 
-                  : "[CODE]";
+                const code =
+                  template.buttonParams && template.buttonParams[index]
+                    ? template.buttonParams[index]
+                    : "[CODE]";
                 displayText += `• ${button.text}: ${code}\n`;
                 break;
             }
@@ -256,7 +306,7 @@ function buildTemplateDisplayText(template) {
       }
     }
   }
-  
+
   return displayText.trim();
 }
 
@@ -268,7 +318,7 @@ export async function POST(request) {
 
     console.log("[whatsapp/send] Environment check:", {
       phoneNumberId: phoneNumberId ? "✅ Set" : "❌ Missing",
-      accessToken: accessToken ? "✅ Set" : "❌ Missing"
+      accessToken: accessToken ? "✅ Set" : "❌ Missing",
     });
 
     if (!phoneNumberId || !accessToken) {
@@ -288,7 +338,7 @@ export async function POST(request) {
       return Response.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { contacts, template, text } = body;
+    const { contacts, template, text, media } = body;
 
     if (!Array.isArray(contacts) || contacts.length === 0) {
       return Response.json(
@@ -297,26 +347,55 @@ export async function POST(request) {
       );
     }
 
-    // Support both template messages and regular text messages
+    // Support template messages, regular text messages, and media messages
     const isTextMessage = !!text;
     const isTemplateMessage = !!template?.name && !!template?.language;
+    const isMediaMessage = !!media?.file;
 
-    if (!isTextMessage && !isTemplateMessage) {
+    if (!isTextMessage && !isTemplateMessage && !isMediaMessage) {
       return Response.json(
-        { error: "Either 'text' or 'template' (with name and language) is required" },
+        {
+          error:
+            "Either 'text', 'template' (with name and language), or 'media' is required",
+        },
         { status: 400 }
       );
     }
 
     console.log(
-      `[whatsapp/send] ${isTextMessage ? `Text: "${text}"` : `Template: "${template.name}" (${template.language})`} → ${contacts.length} contact(s)`
+      `[whatsapp/send] ${
+        isTextMessage
+          ? `Text: "${text}"`
+          : isTemplateMessage
+          ? `Template: "${template.name}" (${template.language})`
+          : `Media: ${media.type}`
+      } → ${contacts.length} contact(s)`
     );
+
+    // ── Handle media upload for media messages ──
+    let mediaId = null;
+    if (isMediaMessage) {
+      try {
+        mediaId = await uploadMediaFile(media, phoneNumberId, accessToken);
+        console.log(`[whatsapp/send] Media uploaded: ${mediaId}`);
+      } catch (err) {
+        console.error("[whatsapp/send] Media upload error:", err.message);
+        return Response.json(
+          { error: `Media upload error: ${err.message}` },
+          { status: 500 }
+        );
+      }
+    }
 
     // ── Build components for template messages only ──
     let components = [];
     if (isTemplateMessage) {
       try {
-        components = await buildComponents(template, phoneNumberId, accessToken);
+        components = await buildComponents(
+          template,
+          phoneNumberId,
+          accessToken
+        );
         console.log(
           "[whatsapp/send] Final components:",
           JSON.stringify(components, null, 2)
@@ -344,6 +423,33 @@ export async function POST(request) {
               to: phone,
               type: "text",
               text: { body: text },
+            }
+          : isMediaMessage
+          ? {
+              messaging_product: "whatsapp",
+              to: phone,
+              type: media.type.startsWith("image/")
+                ? "image"
+                : media.type.startsWith("video/")
+                ? "video"
+                : media.type.startsWith("audio/")
+                ? "audio"
+                : "document",
+              [media.type.startsWith("image/")
+                ? "image"
+                : media.type.startsWith("video/")
+                ? "video"
+                : media.type.startsWith("audio/")
+                ? "audio"
+                : "document"]: {
+                id: mediaId,
+                ...(media.caption ? { caption: media.caption } : {}),
+                ...(media.filename &&
+                !media.type.startsWith("image/") &&
+                !media.type.startsWith("video/")
+                  ? { filename: media.filename }
+                  : {}),
+              },
             }
           : {
               messaging_product: "whatsapp",
@@ -380,14 +486,18 @@ export async function POST(request) {
           messageId: data?.messages?.[0]?.id ?? null,
         };
 
-        // Save outbound message to messageStore for both text and template messages
+        // Save outbound message to messageStore for all message types
         if (result.messageId) {
           try {
             const { messageStore } = await import("@/lib/messageStore");
-            
+
             const messageData = {
               id: result.messageId,
-              type: isTextMessage ? "text" : "template",
+              type: isTextMessage
+                ? "text"
+                : isMediaMessage
+                ? getMediaType(media.type)
+                : "template",
               direction: "outbound",
               to: phone,
               status: "sent",
@@ -396,52 +506,73 @@ export async function POST(request) {
 
             if (isTextMessage) {
               messageData.text = text;
+            } else if (isMediaMessage) {
+              // For media messages, store media info
+              const mediaType = getMediaType(media.type);
+              messageData[mediaType] = {
+                id: mediaId,
+                url: media.file, // Store the original base64 data URL for display
+                caption: media.caption || null,
+                filename: media.filename || null,
+              };
+              messageData.text =
+                media.caption ||
+                `${
+                  mediaType.charAt(0).toUpperCase() + mediaType.slice(1)
+                } message`;
             } else {
               // For template messages, store template info and build full display text
               messageData.templateName = template.name;
               messageData.templateLanguage = template.language;
-              
+
               // Store the full template structure for detailed display
               messageData.templateComponents = template.components;
               messageData.templateParams = {
                 headerText: template.headerText || [],
                 bodyParams: template.bodyParams || [],
-                buttonParams: template.buttonParams || []
+                buttonParams: template.buttonParams || [],
               };
-              
+
               // Check if template has media components and store the actual media URL
               let hasMedia = false;
               let mediaType = null;
               let mediaUrl = null;
-              
+
               for (const comp of template.components || []) {
-                if (comp.type === "HEADER" && ["IMAGE", "VIDEO", "DOCUMENT"].includes(comp.format)) {
+                if (
+                  comp.type === "HEADER" &&
+                  ["IMAGE", "VIDEO", "DOCUMENT"].includes(comp.format)
+                ) {
                   hasMedia = true;
                   mediaType = comp.format.toLowerCase();
-                  
+
                   // Get the media URL from the template example
                   const originalUrl = comp.example?.header_handle?.[0];
-                  
+
                   // Create a proxy URL that our frontend can access
-                  mediaUrl = originalUrl ? `/api/template-media?url=${encodeURIComponent(originalUrl)}` : null;
-                  
+                  mediaUrl = originalUrl
+                    ? `/api/template-media?url=${encodeURIComponent(
+                        originalUrl
+                      )}`
+                    : null;
+
                   // Store media info in the message with the proxy URL
                   messageData[mediaType] = {
                     id: "template_media",
                     url: mediaUrl, // Store the proxy URL
                     originalUrl: originalUrl, // Keep original for reference
                     caption: comp.example?.header_text?.[0] || null,
-                    filename: comp.example?.header_text?.[0] || null // For documents
+                    filename: comp.example?.header_text?.[0] || null, // For documents
                   };
                   break;
                 }
               }
-              
+
               // Build full template content display
               let displayText = buildTemplateDisplayText(template);
-              
+
               messageData.text = displayText;
-              
+
               // Set the message type to the media type if it has media
               if (hasMedia) {
                 messageData.type = mediaType;
@@ -449,10 +580,20 @@ export async function POST(request) {
             }
 
             messageStore.save(messageData);
-            console.log(`[whatsapp/send] Saved ${isTextMessage ? 'text' : 'template'} message to store: ${result.messageId}`);
-            console.log(`[whatsapp/send] Message data:`, JSON.stringify(messageData, null, 2));
+            console.log(
+              `[whatsapp/send] Saved ${
+                isTextMessage ? "text" : isMediaMessage ? "media" : "template"
+              } message to store: ${result.messageId}`
+            );
+            console.log(
+              `[whatsapp/send] Message data:`,
+              JSON.stringify(messageData, null, 2)
+            );
           } catch (storeError) {
-            console.error(`[whatsapp/send] Failed to save to messageStore:`, storeError);
+            console.error(
+              `[whatsapp/send] Failed to save to messageStore:`,
+              storeError
+            );
             // Don't fail the whole request if messageStore fails
           }
         }

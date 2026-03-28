@@ -100,6 +100,23 @@ function handleIncoming(msg, value) {
     timestamp:   parseInt(msg.timestamp) * 1000,
   };
 
+  // Add proxy URLs for media messages
+  if (incoming.image?.id) {
+    incoming.image.url = `/api/whatsapp-media?id=${incoming.image.id}`;
+  }
+  if (incoming.video?.id) {
+    incoming.video.url = `/api/whatsapp-media?id=${incoming.video.id}`;
+  }
+  if (incoming.audio?.id) {
+    incoming.audio.url = `/api/whatsapp-media?id=${incoming.audio.id}`;
+  }
+  if (incoming.document?.id) {
+    incoming.document.url = `/api/whatsapp-media?id=${incoming.document.id}`;
+  }
+  if (incoming.sticker?.id) {
+    incoming.sticker.url = `/api/whatsapp-media?id=${incoming.sticker.id}`;
+  }
+
   const saved = messageStore.save(incoming);
   console.log(`[webhook] inbound saved | from=${incoming.from} | text="${incoming.text ?? incoming.type}"`);
   return saved;
